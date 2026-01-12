@@ -1,6 +1,6 @@
-# Claude Code Statusline
+# My KISS Claude Code Statusline
 
-A clean, informative statusline for [Claude Code](https://claude.ai/code) with context usage tracking.
+A super simple statusline for Claude Code.
 
 ## Features
 
@@ -62,7 +62,3 @@ CONTEXT_DANGER=80     # Red threshold (%)
 | Context bar (danger) | Red |
 | Lines added | Green |
 | Lines removed | Red |
-
-## License
-
-MIT
