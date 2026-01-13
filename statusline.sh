@@ -59,27 +59,22 @@ case "$model_id" in
     *)        context_window=200000 ;;
 esac
 
-# Parse transcript to get token count
+# Parse transcript to get token count from the most recent message
+# The last message's input_tokens represents the current context size
 if [[ -n "$transcript_path" && -f "$transcript_path" ]]; then
-    # Sum up tokens from all messages in transcript
-    # The transcript contains message objects with token counts
+    # Get the most recent message's input tokens (this is the current context size)
     total_tokens=$(jq '
-        [.[] | 
-            if .message then
-                (.message.usage.input_tokens // 0) + (.message.usage.output_tokens // 0)
-            else
-                0
-            end
-        ] | add // 0
+        [.[] | select(.message.usage.input_tokens) | .message.usage.input_tokens] | last // 0
     ' "$transcript_path" 2>/dev/null)
-    
-    # Fallback: try alternate structure
-    if [[ "$total_tokens" == "0" || -z "$total_tokens" ]]; then
+
+    # Fallback: try cache_read_input_tokens + cache_creation_input_tokens + input_tokens
+    if [[ "$total_tokens" == "0" || -z "$total_tokens" || "$total_tokens" == "null" ]]; then
         total_tokens=$(jq '
-            [.[] | .tokens // 0] | add // 0
+            [.[] | select(.message.usage) | .message.usage] | last |
+            ((.cache_read_input_tokens // 0) + (.cache_creation_input_tokens // 0) + (.input_tokens // 0))
         ' "$transcript_path" 2>/dev/null)
     fi
-    
+
     # Calculate percentage
     if [[ "$total_tokens" =~ ^[0-9]+$ && "$total_tokens" -gt 0 ]]; then
         context_pct=$((total_tokens * 100 / context_window))
