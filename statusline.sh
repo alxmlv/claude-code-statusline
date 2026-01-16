@@ -34,11 +34,9 @@ DIM='\033[90m'        # Dim - separators
 # ══════════════════════════════════════════════════════════════════════════════
 
 model=$(echo "$input" | jq -r '.model.display_name // "?"')
-model_id=$(echo "$input" | jq -r '.model.id // ""')
 cwd=$(echo "$input" | jq -r '.cwd // .workspace.current_dir // "~"')
 added=$(echo "$input" | jq -r '.cost.total_lines_added // 0')
 removed=$(echo "$input" | jq -r '.cost.total_lines_removed // 0')
-transcript_path=$(echo "$input" | jq -r '.transcript_path // ""')
 
 # Get short directory name
 dir=$(basename "$cwd")
@@ -48,39 +46,9 @@ dir=$(basename "$cwd")
 # CONTEXT CALCULATION
 # ══════════════════════════════════════════════════════════════════════════════
 
-context_pct=0
-context_bar=""
-
-# Determine context window size based on model
-case "$model_id" in
-    *opus*)   context_window=200000 ;;
-    *sonnet*) context_window=200000 ;;
-    *haiku*)  context_window=200000 ;;
-    *)        context_window=200000 ;;
-esac
-
-# Parse transcript to get token count from the most recent message
-# The last message's input_tokens represents the current context size
-if [[ -n "$transcript_path" && -f "$transcript_path" ]]; then
-    # Get the most recent message's input tokens (this is the current context size)
-    total_tokens=$(jq '
-        [.[] | select(.message.usage.input_tokens) | .message.usage.input_tokens] | last // 0
-    ' "$transcript_path" 2>/dev/null)
-
-    # Fallback: try cache_read_input_tokens + cache_creation_input_tokens + input_tokens
-    if [[ "$total_tokens" == "0" || -z "$total_tokens" || "$total_tokens" == "null" ]]; then
-        total_tokens=$(jq '
-            [.[] | select(.message.usage) | .message.usage] | last |
-            ((.cache_read_input_tokens // 0) + (.cache_creation_input_tokens // 0) + (.input_tokens // 0))
-        ' "$transcript_path" 2>/dev/null)
-    fi
-
-    # Calculate percentage
-    if [[ "$total_tokens" =~ ^[0-9]+$ && "$total_tokens" -gt 0 ]]; then
-        context_pct=$((total_tokens * 100 / context_window))
-        [[ $context_pct -gt 100 ]] && context_pct=100
-    fi
-fi
+# Get context percentage directly from the JSON input
+context_pct=$(echo "$input" | jq -r '.context_window.used_percentage // 0')
+[[ ! "$context_pct" =~ ^[0-9]+$ ]] && context_pct=0
 
 # Build progress bar with color based on usage
 build_bar() {
